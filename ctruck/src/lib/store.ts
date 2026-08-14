@@ -4,7 +4,7 @@
 
 import type {
   Truck, User, DailyCheckin, Route, RouteAssignment, DeliveryStop,
-  DeliveryRecord, StopVisit, MaintenanceAlert, KmWarning, Expense,
+  DeliveryRecord, StopVisit, MaintenanceAlert, KmWarning, Expense, CargoReception,
 } from './types'
 import { hoy } from './format'
 
@@ -19,6 +19,7 @@ export interface DB {
   route_assignments: RouteAssignment[]
   delivery_stops: DeliveryStop[]
   delivery_records: DeliveryRecord[]
+  cargo_receptions: CargoReception[]
   stop_visits: StopVisit[]
   maintenance_alerts: MaintenanceAlert[]
   km_warnings: KmWarning[]
@@ -81,7 +82,7 @@ function seed(): DB {
   }
   return {
     trucks, users, routes, route_assignments, delivery_stops, expenses,
-    daily_checkins: [], delivery_records: [], stop_visits: [],
+    daily_checkins: [], delivery_records: [], cargo_receptions: [], stop_visits: [],
     maintenance_alerts: [], km_warnings: [],
   }
 }
@@ -89,7 +90,13 @@ function seed(): DB {
 function load(): DB {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw) as DB
+      // Datos guardados por versiones anteriores: completar colecciones nuevas
+      parsed.cargo_receptions ??= []
+      parsed.stop_visits ??= []
+      return parsed
+    }
   } catch { /* seed fresco si el storage está corrupto */ }
   const db = seed()
   save(db)

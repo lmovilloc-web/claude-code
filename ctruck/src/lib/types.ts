@@ -91,6 +91,17 @@ export interface DeliveryRecord {
   timestamp: string
 }
 
+export interface CargoReception {
+  id: string
+  route_assignment_id: string
+  reported_by: string
+  invoice_number: string
+  dispatcher_name: string
+  route_confirmed: boolean
+  photo_urls: string[]
+  timestamp: string
+}
+
 export interface StopVisit {
   id: string
   stop_id: string

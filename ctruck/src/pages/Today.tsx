@@ -118,8 +118,13 @@ export default function Today() {
             )}
           </div>
           {!checkin && <Button onClick={() => nav('/checkin')}>Iniciar check-in</Button>}
-          {checkin?.aptitude_result === 'apto' && !checkin.checkout_time && user.role === 'driver' && (
-            <Link to="/checkout"><Button variant="secondary">Check-out</Button></Link>
+          {checkin?.aptitude_result === 'apto' && !checkin.checkout_time && (
+            <div className="flex gap-2 flex-wrap">
+              {assignment && !db.cargo_receptions.some(c => c.route_assignment_id === assignment.id && c.reported_by === user.id) && (
+                <Link to="/recepcion"><Button variant="secondary">📦 Recepción de carga</Button></Link>
+              )}
+              {user.role === 'driver' && <Link to="/checkout"><Button variant="secondary">Check-out</Button></Link>}
+            </div>
           )}
         </div>
       </Card>

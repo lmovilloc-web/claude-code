@@ -4,10 +4,10 @@ import { useMemo, useState, useSyncExternalStore } from 'react'
 import Shell, { roleLabel } from '../components/Shell'
 import { Badge, Button, Card, Dot, Empty, Progress, Segmented, Stat } from '../components/ui'
 import { store } from '../lib/store'
-import { clp, fecha, hoy, num } from '../lib/format'
+import { clp, fecha, hora, hoy, num } from '../lib/format'
 import type { ExpenseCategory } from '../lib/types'
 
-type Tab = 'resumen' | 'flota' | 'rutas' | 'gastos' | 'pnl' | 'equipo'
+type Tab = 'resumen' | 'flota' | 'rutas' | 'hoja' | 'gastos' | 'pnl' | 'equipo'
 
 const CAT_LABEL: Record<ExpenseCategory, string> = {
   combustible: 'Combustible', peaje_tag: 'Peajes / TAG', mantencion: 'Mantención',
@@ -37,6 +37,7 @@ export default function Admin() {
             { value: 'resumen', label: pendingAlerts ? `Resumen · ${pendingAlerts}` : 'Resumen' },
             { value: 'flota', label: 'Flota' },
             { value: 'rutas', label: 'Rutas' },
+            { value: 'hoja', label: 'Hoja de Ruta' },
             { value: 'gastos', label: 'Gastos' },
             { value: 'pnl', label: 'P&L' },
             { value: 'equipo', label: 'Equipo' },
@@ -46,6 +47,7 @@ export default function Admin() {
       {tab === 'resumen' && <Resumen />}
       {tab === 'flota' && <Flota />}
       {tab === 'rutas' && <Rutas />}
+      {tab === 'hoja' && <HojaDeRuta />}
       {tab === 'gastos' && <Gastos />}
       {tab === 'pnl' && <PnL />}
       {tab === 'equipo' && <Equipo />}
@@ -283,6 +285,96 @@ function Rutas() {
         </div>
         <p className="t-footnote mt-2">Desvío estimado en +18% de km a {clp(COSTO_KM_DESVIO)}/km de combustible. Ajustable al conectar datos reales.</p>
       </div>
+    </div>
+  )
+}
+
+/* ─── Hoja de Ruta ────────────────────────────────────────── */
+function HojaDeRuta() {
+  const db = useSyncExternalStore(store.subscribe, store.get)
+  const [truckId, setTruckId] = useState(db.trucks[0]?.id ?? '')
+  const [date, setDate] = useState(hoy())
+
+  const truck = db.trucks.find(t => t.id === truckId)
+  const checkins = db.daily_checkins.filter(c => c.truck_id === truckId && c.date === date)
+  const assignment = db.route_assignments.find(a => a.truck_id === truckId && a.date === date)
+  const route = assignment ? db.routes.find(r => r.id === assignment.route_id) : null
+  const stops = assignment ? db.delivery_stops.filter(s => s.route_assignment_id === assignment.id) : []
+  const records = db.delivery_records.filter(r => stops.some(s => s.id === r.stop_id))
+  const receptions = assignment ? db.cargo_receptions.filter(c => c.route_assignment_id === assignment.id) : []
+  const driverCi = checkins.find(c => c.role === 'driver')
+
+  const exportPdf = async () => {
+    // jsPDF se carga bajo demanda: no pesa en la carga inicial de la app
+    const { buildRouteSheet } = await import('../lib/routeSheet')
+    const doc = buildRouteSheet(db, truckId, date)
+    if (doc && truck) doc.save(`hoja-ruta_${truck.code}_${date}.pdf`)
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <label className="block">
+            <span className="t-caption block mb-2">Camión</span>
+            <select value={truckId} onChange={e => setTruckId(e.target.value)}
+              className="w-full bg-os-card2 hairline rounded-os px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-accent/60">
+              {db.trucks.map(t => <option key={t.id} value={t.id}>{t.code} · {t.plate}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="t-caption block mb-2">Fecha</span>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className="w-full bg-os-card2 hairline rounded-os px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-accent/60" />
+          </label>
+          <div className="flex items-end"><Button full onClick={exportPdf}>Exportar PDF</Button></div>
+        </div>
+      </Card>
+
+      {/* Vista previa del documento */}
+      <Card pad={false}>
+        <div className="px-5 py-4 border-b border-os-border flex items-center justify-between">
+          <span className="t-headline">{truck?.code} · {fecha(date)}</span>
+          {route ? <Badge tone="info">{route.name}</Badge> : <Badge tone="muted">Sin ruta</Badge>}
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <div className="t-caption mb-1.5">Aptitud y check-in</div>
+            {checkins.length === 0 && <div className="t-subhead">Sin registros ese día.</div>}
+            {checkins.map(c => {
+              const u = db.users.find(u => u.id === c.user_id)
+              return (
+                <div key={c.id} className="flex items-center justify-between py-1 flex-wrap gap-2">
+                  <span className="t-body">{u?.name}</span>
+                  {c.aptitude_result === 'apto'
+                    ? <span className="t-footnote tnum">Apto · {hora(c.checkin_time)}{c.km_in !== null ? ` · ${num(c.km_in)} km` : ''}{c.km_warning ? ' ⚠' : ''}</span>
+                    : <Badge tone="danger">No apto</Badge>}
+                </div>
+              )
+            })}
+          </div>
+          <div>
+            <div className="t-caption mb-1.5">Recepción de carga</div>
+            {receptions.length === 0 && <div className="t-subhead">Sin registro.</div>}
+            {receptions.map(r => (
+              <div key={r.id} className="t-footnote py-0.5">
+                {db.users.find(u => u.id === r.reported_by)?.name}: factura {r.invoice_number} · {r.dispatcher_name} · {r.photo_urls.length} foto(s)
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="t-caption mb-1.5">Entregas</div>
+            <div className="t-subhead tnum">{records.length}/{stops.length} completadas{records.some(r => r.has_issue) ? ` · ${records.filter(r => r.has_issue).length} con incidente` : ''}</div>
+          </div>
+          <div>
+            <div className="t-caption mb-1.5">Check-out</div>
+            {driverCi?.checkout_time
+              ? <div className="t-subhead tnum">{num(driverCi.checkout_km! - (driverCi.km_in ?? 0))} km recorridos · cerró {hora(driverCi.checkout_time)}{driverCi.checkout_warning ? ' ⚠ fuera de tolerancia' : ''}</div>
+              : <div className="t-subhead">Turno sin cerrar o sin registro.</div>}
+          </div>
+        </div>
+      </Card>
+      <p className="t-footnote">El PDF incluye las fotos del check-in y el detalle parada por parada con tiempos de permanencia. Al conectar Supabase, cada exportación se guarda además en el bucket <code>route-sheets</code>.</p>
     </div>
   )
 }

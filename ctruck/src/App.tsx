@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Today from './pages/Today'
 import CheckIn from './pages/CheckIn'
 import CheckOut from './pages/CheckOut'
+import CargoReception from './pages/CargoReception'
 import Admin from './pages/Admin'
 
 function Guard({ children, roles }: { children: JSX.Element; roles?: string[] }) {
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/hoy" element={<Guard roles={['driver', 'helper']}><Today /></Guard>} />
           <Route path="/checkin" element={<Guard roles={['driver', 'helper']}><CheckIn /></Guard>} />
           <Route path="/checkout" element={<Guard roles={['driver']}><CheckOut /></Guard>} />
+          <Route path="/recepcion" element={<Guard roles={['driver', 'helper']}><CargoReception /></Guard>} />
           <Route path="/admin" element={<Guard roles={['admin', 'supervisor']}><Admin /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
