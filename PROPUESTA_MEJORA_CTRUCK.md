@@ -135,6 +135,57 @@ const fullRoute = `https://www.google.com/maps/dir/?api=1` +
 
 ---
 
+## Fase 6 — Trazabilidad GPS y control de tiempos por parada (1 semana)
+
+### ¿Se pueden capturar los km recorridos con el link de Google Maps?
+
+**No.** El deep link abre la app de Google Maps y no devuelve ningún dato a CTruck. Pero no hace falta: el celular del chofer puede registrar el recorrido con su GPS, gratis, usando la Geolocation API mientras CTruck está abierto.
+
+```ts
+// Al iniciar la ruta: registrar puntos GPS cada ~30 s
+const watchId = navigator.geolocation.watchPosition(pos => {
+  guardarPunto(pos.coords.latitude, pos.coords.longitude, pos.timestamp);
+}, onError, { enableHighAccuracy: true, maximumAge: 30000 });
+// km recorridos = suma de distancias haversine entre puntos consecutivos
+```
+
+- Nueva tabla `route_tracks` (route_assignment_id, lat, lng, timestamp), offline-first: puntos en IndexedDB, sync al recuperar señal.
+- **El odómetro sigue siendo la fuente oficial de km** (check-in/check-out); el GPS aporta trazabilidad: recorrido en mapa, desvíos y contraste km GPS vs km odómetro.
+- **Limitación honesta:** los navegadores móviles pausan el GPS en segundo plano (p. ej. mientras Google Maps navega); el registro se reanuda al volver a CTruck. Para GPS continuo en background se necesitaría empaquetar la PWA con Capacitor (gratis, mismo código) — opcional futuro.
+
+### Cronómetro por parada con alertas cada 15 minutos
+
+Flujo: al llegar, el chofer/pioneta marca **"Llegué"** (clock-in de parada, con punto GPS); corre un cronómetro visible; al marcar **"Me voy"** se cierra la visita (clock-out de parada).
+
+```sql
+create table stop_visits (
+  id uuid primary key default gen_random_uuid(),
+  stop_id uuid references delivery_stops(id),
+  route_assignment_id uuid references route_assignments(id),
+  arrived_at timestamptz not null,
+  departed_at timestamptz,          -- null = todavía en la parada
+  arrival_lat float8, arrival_lng float8,
+  dwell_minutes int generated always as
+    (extract(epoch from (departed_at - arrived_at))/60) stored,
+  reported_by uuid references users(id)
+);
+
+create table stop_dwell_alerts (
+  id uuid primary key default gen_random_uuid(),
+  stop_visit_id uuid references stop_visits(id),
+  minutes_elapsed int not null,     -- 15, 30, 45…
+  notified_at timestamptz default now(),
+  acknowledged boolean default false
+);
+```
+
+- **Alerta local al chofer:** el cronómetro vibra/notifica a los 15, 30, 45… min, calculado en el dispositivo — funciona sin señal.
+- **Alerta al supervisor:** job `pg_cron` cada 5 min busca visitas abiertas (`departed_at is null`) que cruzaron un múltiplo de 15 min sin alerta, inserta en `stop_dwell_alerts` y dispara Web Push. Server-side: funciona aunque el chofer pierda señal o cierre la app.
+- El tiempo por parada alimenta el dashboard: promedio por cliente, paradas problemáticas, comparación entre choferes — insumo para renegociar ventanas de descarga.
+- "Llegué"/"Me voy" se integra al bloqueo secuencial de paradas: la siguiente se desbloquea al cerrar la visita anterior.
+
+---
+
 ## Seguridad y datos
 
 - RLS en `expenses`/`revenues`: admin todo; supervisor su flota; chofer solo inserta combustible/peaje de su camión y ve lo propio.
@@ -151,5 +202,6 @@ const fullRoute = `https://www.google.com/maps/dir/?api=1` +
 | 3 | P&L por camión y consolidado | 1 sem | Fase 2 |
 | 4 | Correo semanal automático | 0,5 sem | Fase 2 |
 | 5 | Google Maps (deep links + mapa admin) | 0,5–1 sem | — |
+| 6 | Trazabilidad GPS + cronómetro por parada con alertas | 1 sem | Fase 5 |
 
-Fases 1, 2 y 5 pueden partir en paralelo. **Total estimado: 4–5 semanas.**
+Fases 1, 2 y 5 pueden partir en paralelo. **Total estimado: 5–6 semanas.**
