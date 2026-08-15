@@ -1,6 +1,6 @@
 // Tipos del dominio CTruck — espejo de las tablas de Supabase
 
-export type Role = 'admin' | 'supervisor' | 'driver' | 'helper'
+export type Role = 'super_admin' | 'admin' | 'supervisor' | 'driver' | 'helper'
 export type TruckStatus = 'operativo' | 'mantencion' | 'detenido'
 export type AssignmentStatus = 'pendiente' | 'en_curso' | 'completada'
 export type AptitudeResult = 'apto' | 'no_apto'

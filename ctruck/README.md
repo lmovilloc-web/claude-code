@@ -19,7 +19,7 @@ Sin credenciales de Supabase la app corre en **Modo Demo**: datos seed en localS
 
 El proyecto vive en Supabase (`ctruck`, región `sa-east-1`, ref `vzjzdalsrcvfsjeoxavp`) con las migraciones de `supabase/migrations/` ya aplicadas (esquema → RLS → seed → storage/realtime). `.env.example` trae las credenciales públicas (la seguridad la da RLS); copiar a `.env` y compilar.
 
-Acceso del equipo: correo `<nombre>@ctruck.cl` con contraseña temporal compartida — **cambiarla desde el dashboard de Supabase (Authentication → Users) antes de usar en producción**.
+Acceso: existe un único usuario, `l.movilloc@gmail.com` (rol `super_admin`), con contraseña temporal — **cambiarla desde el dashboard de Supabase (Authentication → Users)**. Los perfiles del equipo (choferes/pionetas) se crean desde ahí mismo por ahora; el CRUD desde el panel llega con la Fase 1 completa.
 
 Arquitectura de sincronización (`src/lib/remote.ts`): la UI siempre lee el store local (offline-first); al iniciar sesión se hidrata desde Supabase, cada cambio local se empuja con diff por id (insert/update según RLS) con reintento al recuperar conexión, y Realtime aplica los cambios de otros dispositivos al instante. Las fotos suben a los buckets (`checkin-photos`, `cargo-photos`) y si no hay señal quedan como dataURL local hasta el próximo intento. Admin/supervisor reciben notificaciones del navegador ante: NO APTO, avisos de km, mantención roja, incidentes de entrega y recepciones de carga.
 

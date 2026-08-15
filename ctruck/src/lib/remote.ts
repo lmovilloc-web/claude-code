@@ -116,7 +116,7 @@ function scheduleSync() {
 }
 
 function notify(body: string) {
-  if (myRole !== 'admin' && myRole !== 'supervisor') return
+  if (!myRole || !['super_admin', 'admin', 'supervisor'].includes(myRole)) return
   if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
     new Notification('CTruck · Alerta', { body })
   }
@@ -177,7 +177,7 @@ export function startSync(role: Role): () => void {
   const onOnline = () => syncUp()
   window.addEventListener('online', onOnline)
   syncUp() // drena lo pendiente de sesiones offline
-  if ((role === 'admin' || role === 'supervisor') &&
+  if (['super_admin', 'admin', 'supervisor'].includes(role) &&
       typeof Notification !== 'undefined' && Notification.permission === 'default') {
     Notification.requestPermission()
   }

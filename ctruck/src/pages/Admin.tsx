@@ -525,7 +525,7 @@ function Equipo() {
                 <div className="t-headline">{u.name}</div>
                 <div className="t-footnote">{roleLabel(u.role)}{truck ? ` · ${truck.code}` : ''} · {u.rut}</div>
               </div>
-              {u.role === 'admin' || u.role === 'supervisor'
+              {['super_admin', 'admin', 'supervisor'].includes(u.role)
                 ? <Badge tone="muted">Panel</Badge>
                 : ci
                   ? ci.aptitude_result === 'apto'

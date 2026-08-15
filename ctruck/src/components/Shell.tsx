@@ -51,5 +51,5 @@ export default function Shell({ children, title }: { children: ReactNode; title?
 }
 
 export function roleLabel(role: string) {
-  return { admin: 'Administrador', supervisor: 'Supervisor', driver: 'Chofer', helper: 'Pioneta' }[role] ?? role
+  return { super_admin: 'Super Admin', admin: 'Administrador', supervisor: 'Supervisor', driver: 'Chofer', helper: 'Pioneta' }[role] ?? role
 }

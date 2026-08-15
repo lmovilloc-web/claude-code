@@ -18,7 +18,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
 
   const goHome = (role: string) =>
-    nav(role === 'admin' || role === 'supervisor' ? '/admin' : '/hoy', { replace: true })
+    nav(['super_admin', 'admin', 'supervisor'].includes(role) ? '/admin' : '/hoy', { replace: true })
 
   if (!isDemo && ready && user) {
     goHome(user.role)
