@@ -78,7 +78,12 @@ export default function CheckIn() {
     setPhase('photo_dash')
   }
 
-  const finish = () => {
+  const finish = async () => {
+    // Con Supabase: subir fotos al bucket checkin-photos (si falla queda la dataURL local)
+    const { maybeUploadPhotos } = await import('../lib/remote')
+    const [dashUrl, cabinUrl] = await maybeUploadPhotos('checkin-photos',
+      [photoDash, photoCabin].filter((p): p is string => p !== null))
+      .then(urls => [urls[0] ?? photoDash, urls[1] ?? photoCabin])
     store.mutate(d => {
       d.daily_checkins.push({
         id: store.uid(), user_id: user.id, truck_id: user.truck_id, date: hoy(),
@@ -86,7 +91,7 @@ export default function CheckIn() {
         km_in: kmOk, km_system: truck?.current_km ?? null,
         km_diff: kmOk !== null && truck ? kmOk - truck.current_km : null,
         km_warning: kmWarn,
-        dashboard_photo_url: photoDash, cabin_photo_url: photoCabin,
+        dashboard_photo_url: dashUrl, cabin_photo_url: cabinUrl,
         signature_name: user.name,
         checkout_km: null, checkout_diff: null, checkout_warning: false,
         checkin_time: new Date().toISOString(), checkout_time: null,

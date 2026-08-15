@@ -21,6 +21,7 @@ export interface User {
   role: Role
   truck_id: string | null
   email?: string
+  auth_id?: string
   active: boolean
 }
 
@@ -107,6 +108,7 @@ export interface StopVisit {
   stop_id: string
   arrived_at: string
   departed_at: string | null
+  reported_by?: string
 }
 
 export interface MaintenanceAlert {

@@ -57,12 +57,14 @@ export default function CargoReception() {
   const totalKg = stops.reduce((a, s) => a + s.planned_kg, 0)
   const canSubmit = confirmed && invoice.trim() && dispatcher.trim() && photos.length >= 1
 
-  const submit = () => {
+  const submit = async () => {
+    const { maybeUploadPhotos } = await import('../lib/remote')
+    const uploaded = await maybeUploadPhotos('cargo-photos', photos)
     store.mutate(d => {
       d.cargo_receptions.push({
         id: store.uid(), route_assignment_id: assignment.id, reported_by: user.id,
         invoice_number: invoice.trim(), dispatcher_name: dispatcher.trim(),
-        route_confirmed: true, photo_urls: photos, timestamp: new Date().toISOString(),
+        route_confirmed: true, photo_urls: uploaded, timestamp: new Date().toISOString(),
       })
     })
     setDone(true)

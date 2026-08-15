@@ -78,7 +78,7 @@ export default function Today() {
   const arrive = (stopId: string) => {
     if (Notification && Notification.permission === 'default') Notification.requestPermission()
     store.mutate(d => {
-      d.stop_visits.push({ id: store.uid(), stop_id: stopId, arrived_at: new Date().toISOString(), departed_at: null })
+      d.stop_visits.push({ id: store.uid(), stop_id: stopId, arrived_at: new Date().toISOString(), departed_at: null, reported_by: user.id })
     })
   }
 

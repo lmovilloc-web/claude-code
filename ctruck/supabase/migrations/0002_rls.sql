@@ -38,12 +38,14 @@ alter table stop_dwell_alerts enable row level security;
 -- Lectura general para personal autenticado en catálogos
 create policy trucks_read on trucks for select to authenticated using (true);
 create policy routes_read on routes for select to authenticated using (true);
-create policy users_read_self on users for select to authenticated
-  using (auth_id = auth.uid() or my_role() in ('admin','supervisor'));
+create policy users_read on users for select to authenticated using (true);
 
 -- Admin/supervisor gestionan catálogos
 create policy trucks_admin on trucks for all to authenticated
   using (my_role() in ('admin','supervisor')) with check (my_role() in ('admin','supervisor'));
+-- El chofer actualiza el km de su propio camión en el check-out
+create policy trucks_driver_update on trucks for update to authenticated
+  using (id = my_truck_id()) with check (id = my_truck_id());
 create policy routes_admin on routes for all to authenticated
   using (my_role() = 'admin') with check (my_role() = 'admin');
 create policy users_admin on users for all to authenticated
@@ -62,11 +64,14 @@ create policy assignments_read on route_assignments for select to authenticated
   using (truck_id = my_truck_id() or driver_id = my_user_id() or my_role() in ('admin','supervisor'));
 create policy assignments_admin on route_assignments for all to authenticated
   using (my_role() in ('admin','supervisor')) with check (my_role() in ('admin','supervisor'));
+-- El chofer/pioneta actualiza el estado de la asignación de su camión
+create policy assignments_crew_update on route_assignments for update to authenticated
+  using (truck_id = my_truck_id()) with check (truck_id = my_truck_id());
 create policy stops_read on delivery_stops for select to authenticated
   using (exists (select 1 from route_assignments a where a.id = route_assignment_id
     and (a.truck_id = my_truck_id() or my_role() in ('admin','supervisor'))));
 create policy stops_admin on delivery_stops for all to authenticated
-  using (my_role() = 'admin') with check (my_role() = 'admin');
+  using (my_role() in ('admin','supervisor')) with check (my_role() in ('admin','supervisor'));
 
 -- Recepciones, entregas, visitas y tracks: inserta el personal del camión, lee el panel
 create policy receptions_rw on cargo_receptions for all to authenticated
@@ -84,9 +89,10 @@ create policy tracks_read on route_tracks for select to authenticated
   using (my_role() in ('admin','supervisor'));
 
 -- Alertas: panel gestiona; involucrados leen
-create policy maint_read on maintenance_alerts for select to authenticated using (true);
-create policy maint_admin on maintenance_alerts for all to authenticated
-  using (my_role() in ('admin','supervisor')) with check (true);
+create policy maint_select on maintenance_alerts for select to authenticated using (true);
+create policy maint_insert on maintenance_alerts for insert to authenticated with check (true);
+create policy maint_update on maintenance_alerts for update to authenticated
+  using (my_role() in ('admin','supervisor'));
 create policy kmw_rw on km_warnings for all to authenticated
   using (driver_id = my_user_id() or my_role() in ('admin','supervisor'))
   with check (driver_id = my_user_id() or my_role() in ('admin','supervisor'));

@@ -15,7 +15,13 @@ npm run dev
 
 Sin credenciales de Supabase la app corre en **Modo Demo**: datos seed en localStorage (4 camiones CTR-001…004, choferes, pionetas y rutas a V Región), con todos los flujos operativos.
 
-Para conectar Supabase: copiar `.env.example` a `.env` con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, y aplicar las migraciones de `supabase/migrations/` en orden (esquema → RLS → seed).
+## Producción (Supabase)
+
+El proyecto vive en Supabase (`ctruck`, región `sa-east-1`, ref `vzjzdalsrcvfsjeoxavp`) con las migraciones de `supabase/migrations/` ya aplicadas (esquema → RLS → seed → storage/realtime). `.env.example` trae las credenciales públicas (la seguridad la da RLS); copiar a `.env` y compilar.
+
+Acceso del equipo: correo `<nombre>@ctruck.cl` con contraseña temporal compartida — **cambiarla desde el dashboard de Supabase (Authentication → Users) antes de usar en producción**.
+
+Arquitectura de sincronización (`src/lib/remote.ts`): la UI siempre lee el store local (offline-first); al iniciar sesión se hidrata desde Supabase, cada cambio local se empuja con diff por id (insert/update según RLS) con reintento al recuperar conexión, y Realtime aplica los cambios de otros dispositivos al instante. Las fotos suben a los buckets (`checkin-photos`, `cargo-photos`) y si no hay señal quedan como dataURL local hasta el próximo intento. Admin/supervisor reciben notificaciones del navegador ante: NO APTO, avisos de km, mantención roja, incidentes de entrega y recepciones de carga.
 
 ## Qué está implementado (v0.1)
 

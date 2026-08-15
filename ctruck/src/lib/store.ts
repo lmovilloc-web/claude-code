@@ -128,5 +128,11 @@ export const store = {
     save(db)
     listeners.forEach(l => l())
   },
+  /** Reemplaza todo el estado con datos remotos (modo Supabase). */
+  replaceAll(next: DB) {
+    db = next
+    save(db)
+    listeners.forEach(l => l())
+  },
   uid,
 }
