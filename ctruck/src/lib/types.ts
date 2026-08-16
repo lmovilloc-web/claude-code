@@ -5,6 +5,12 @@ export type TruckStatus = 'operativo' | 'mantencion' | 'detenido'
 export type AssignmentStatus = 'pendiente' | 'en_curso' | 'completada'
 export type AptitudeResult = 'apto' | 'no_apto'
 
+export interface Company {
+  id: string
+  name: string
+  rut: string | null
+}
+
 export interface Truck {
   id: string
   code: string
@@ -12,6 +18,7 @@ export interface Truck {
   current_km: number
   next_maintenance_km: number
   status: TruckStatus
+  company_id?: string | null
 }
 
 export interface User {
@@ -22,6 +29,7 @@ export interface User {
   truck_id: string | null
   email?: string
   auth_id?: string
+  company_id?: string | null
   active: boolean
 }
 
@@ -55,6 +63,7 @@ export interface Route {
   planned_km: number
   has_toll: boolean
   toll_cost: number
+  company_id?: string | null
 }
 
 export interface RouteAssignment {

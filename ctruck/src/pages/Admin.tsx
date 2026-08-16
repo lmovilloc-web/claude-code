@@ -1,25 +1,28 @@
 // Módulo 6 · Panel de administración Truck OS.
 // Tabs: Resumen · Flota · Rutas · Gastos · P&L · Equipo
 import { useMemo, useState, useSyncExternalStore } from 'react'
-import Shell, { roleLabel } from '../components/Shell'
+import Shell from '../components/Shell'
 import { Badge, Button, Card, Dot, Empty, Progress, Segmented, Stat } from '../components/ui'
 import { store } from '../lib/store'
 import { clp, fecha, hora, hoy, num } from '../lib/format'
+import { useAuth } from '../context/AuthContext'
+import { EmpresasTab, EquipoTab, ExpenseForm, RouteForm, StopsEditor, TruckForm } from './Manage'
 import type { ExpenseCategory } from '../lib/types'
 
-type Tab = 'resumen' | 'flota' | 'rutas' | 'hoja' | 'gastos' | 'pnl' | 'equipo'
+type Tab = 'resumen' | 'flota' | 'rutas' | 'hoja' | 'gastos' | 'pnl' | 'equipo' | 'empresas'
 
 const CAT_LABEL: Record<ExpenseCategory, string> = {
   combustible: 'Combustible', peaje_tag: 'Peajes / TAG', mantencion: 'Mantención',
   remuneraciones: 'Remuneraciones', merma: 'Merma', seguros: 'Seguros', otros: 'Otros',
 }
 
-// Ingreso mensual estimado por camión mientras no se conecta facturación real.
-const INGRESO_ESTIMADO_MES = 3950000
+// Ingresos: 0 hasta que se registre facturación real (tabla revenues).
+const INGRESO_ESTIMADO_MES = 0
 
 export default function Admin() {
   const [tab, setTab] = useState<Tab>('resumen')
   const db = useSyncExternalStore(store.subscribe, store.get)
+  const { user: me } = useAuth()
   const today = hoy()
 
   const checkinsToday = db.daily_checkins.filter(c => c.date === today)
@@ -41,6 +44,7 @@ export default function Admin() {
             { value: 'gastos', label: 'Gastos' },
             { value: 'pnl', label: 'P&L' },
             { value: 'equipo', label: 'Equipo' },
+            ...(me?.role === 'super_admin' ? [{ value: 'empresas' as Tab, label: 'Empresas' }] : []),
           ]}
         />
       </div>
@@ -50,7 +54,8 @@ export default function Admin() {
       {tab === 'hoja' && <HojaDeRuta />}
       {tab === 'gastos' && <Gastos />}
       {tab === 'pnl' && <PnL />}
-      {tab === 'equipo' && <Equipo />}
+      {tab === 'equipo' && <EquipoTab />}
+      {tab === 'empresas' && <EmpresasTab />}
     </Shell>
   )
 }
@@ -152,6 +157,8 @@ function Flota() {
   const db = useSyncExternalStore(store.subscribe, store.get)
   return (
     <div className="space-y-4">
+      <TruckForm />
+      {db.trucks.length === 0 && <Empty icon="🚛" title="Sin camiones registrados" sub="Agrega el primero con el botón de arriba." />}
       {db.trucks.map(t => {
         const remaining = t.next_maintenance_km - t.current_km
         const window = 10000 // ventana visual entre mantenciones
@@ -186,42 +193,52 @@ function Flota() {
 /* ─── Rutas ───────────────────────────────────────────────── */
 function Rutas() {
   const db = useSyncExternalStore(store.subscribe, store.get)
-  const [routeId, setRouteId] = useState(db.routes[0]?.id ?? '')
-  const [truckId, setTruckId] = useState(db.trucks[0]?.id ?? '')
+  const [routeId, setRouteId] = useState('')
+  const [truckId, setTruckId] = useState('')
   const today = hoy()
   const COSTO_KM_DESVIO = 520 // CLP/km estimado por combustible en ruta alternativa
+  const effRoute = routeId || db.routes[0]?.id || ''
+  const effTruck = truckId || db.trucks[0]?.id || ''
+  const driverOf = (tid: string) => db.users.find(u => u.truck_id === tid && u.role === 'driver' && u.active)
 
   const assign = () => {
-    const truck = db.trucks.find(t => t.id === truckId)
-    const driver = db.users.find(u => u.truck_id === truckId && u.role === 'driver')
-    if (!truck || !driver) return
+    const driver = driverOf(effTruck)
+    if (!effRoute || !effTruck || !driver) return
     store.mutate(d => {
-      d.route_assignments = d.route_assignments.filter(a => !(a.date === today && a.truck_id === truckId))
-      d.route_assignments.push({ id: store.uid(), route_id: routeId, truck_id: truckId, driver_id: driver.id, date: today, status: 'pendiente' })
+      d.route_assignments = d.route_assignments.filter(a => !(a.date === today && a.truck_id === effTruck))
+      d.route_assignments.push({ id: store.uid(), route_id: effRoute, truck_id: effTruck, driver_id: driver.id, date: today, status: 'pendiente' })
     })
   }
 
   return (
     <div className="space-y-6">
+      <RouteForm />
       <Card>
         <h2 className="t-headline mb-4">Asignar ruta de hoy</h2>
-        <div className="grid sm:grid-cols-3 gap-3">
-          <label className="block">
-            <span className="t-caption block mb-2">Ruta</span>
-            <select value={routeId} onChange={e => setRouteId(e.target.value)}
-              className="w-full bg-os-card2 hairline rounded-os px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-accent/60">
-              {db.routes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className="t-caption block mb-2">Camión</span>
-            <select value={truckId} onChange={e => setTruckId(e.target.value)}
-              className="w-full bg-os-card2 hairline rounded-os px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-accent/60">
-              {db.trucks.map(t => <option key={t.id} value={t.id}>{t.code} · {db.users.find(u => u.truck_id === t.id && u.role === 'driver')?.name ?? 'sin chofer'}</option>)}
-            </select>
-          </label>
-          <div className="flex items-end"><Button full onClick={assign}>Asignar</Button></div>
-        </div>
+        {db.routes.length === 0 || db.trucks.length === 0 ? (
+          <p className="t-subhead">Necesitas al menos una ruta y un camión para asignar. {db.routes.length === 0 ? 'Crea la primera ruta arriba.' : 'Agrega un camión en el tab Flota.'}</p>
+        ) : (
+          <>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <label className="block">
+                <span className="t-caption block mb-2">Ruta</span>
+                <select value={effRoute} onChange={e => setRouteId(e.target.value)}
+                  className="w-full bg-os-card2 hairline rounded-os px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-accent/60">
+                  {db.routes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="t-caption block mb-2">Camión</span>
+                <select value={effTruck} onChange={e => setTruckId(e.target.value)}
+                  className="w-full bg-os-card2 hairline rounded-os px-4 py-3 text-[16px] outline-none focus:ring-2 focus:ring-accent/60">
+                  {db.trucks.map(t => <option key={t.id} value={t.id}>{t.code} · {db.users.find(u => u.truck_id === t.id && u.role === 'driver')?.name ?? 'sin chofer'}</option>)}
+                </select>
+              </label>
+              <div className="flex items-end"><Button full disabled={!driverOf(effTruck)} onClick={assign}>Asignar</Button></div>
+            </div>
+            {!driverOf(effTruck) && <p className="t-footnote text-warn mt-2">Ese camión no tiene chofer activo asignado — asígnale uno en el tab Equipo.</p>}
+          </>
+        )}
       </Card>
 
       <div>
@@ -248,6 +265,12 @@ function Rutas() {
               })}
             </Card>
           )}
+        {db.route_assignments.filter(a => a.date === today).map(a => (
+          <Card key={`stops-${a.id}`} className="mt-3">
+            <span className="t-headline">{db.routes.find(r => r.id === a.route_id)?.name} · paradas del día</span>
+            <StopsEditor assignmentId={a.id} />
+          </Card>
+        ))}
       </div>
 
       <div>
@@ -398,6 +421,7 @@ function Gastos() {
 
   return (
     <div className="space-y-6">
+      <ExpenseForm />
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Segmented
           value={truckFilter}
@@ -432,7 +456,7 @@ function Gastos() {
           </div>
         </Card>
       </div>
-      <p className="t-footnote">El registro móvil de gastos con foto de boleta (chofer) llega en la Fase 2 completa; por ahora los gastos se cargan desde el panel o el seed demo.</p>
+      <p className="t-footnote">Los gastos se registran desde este panel. El registro móvil con foto de boleta (chofer) llega en la siguiente iteración.</p>
     </div>
   )
 }
@@ -459,7 +483,7 @@ function PnL() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Stat label="Ingresos del mes" value={clp(totals.ingreso)} sub="estimados" />
+        <Stat label="Ingresos del mes" value={clp(totals.ingreso)} sub="aún sin registro" />
         <Stat label="Gastos" value={clp(totals.gasto)} />
         <Stat label="Resultado" value={clp(resultado)} tone={resultado >= 0 ? 'ok' : 'danger'} />
         <Stat label="Margen" value={`${((resultado / (totals.ingreso || 1)) * 100).toFixed(1)}%`} tone={resultado >= 0 ? 'ok' : 'danger'} />
@@ -504,39 +528,7 @@ function PnL() {
           </tbody>
         </table>
       </div>
-      <p className="t-footnote">Cifras en CLP, mes en curso. Los ingresos son estimados hasta conectar la facturación (tabla <code>revenues</code> ya incluida en las migraciones). El consolidado semanal por correo se activa al conectar Supabase + Resend.</p>
-    </div>
-  )
-}
-
-/* ─── Equipo ──────────────────────────────────────────────── */
-function Equipo() {
-  const db = useSyncExternalStore(store.subscribe, store.get)
-  const today = hoy()
-  return (
-    <div className="space-y-6">
-      <Card pad={false}>
-        {db.users.filter(u => u.active).map((u, i) => {
-          const ci = db.daily_checkins.find(c => c.user_id === u.id && c.date === today)
-          const truck = db.trucks.find(t => t.id === u.truck_id)
-          return (
-            <div key={u.id} className={`flex items-center justify-between gap-3 px-5 py-4 flex-wrap ${i > 0 ? 'border-t border-os-border' : ''}`}>
-              <div>
-                <div className="t-headline">{u.name}</div>
-                <div className="t-footnote">{roleLabel(u.role)}{truck ? ` · ${truck.code}` : ''} · {u.rut}</div>
-              </div>
-              {['super_admin', 'admin', 'supervisor'].includes(u.role)
-                ? <Badge tone="muted">Panel</Badge>
-                : ci
-                  ? ci.aptitude_result === 'apto'
-                    ? <Badge tone={ci.checkout_time ? 'muted' : 'ok'}>{ci.checkout_time ? `Cerrado · ${num(ci.checkout_km! - (ci.km_in ?? 0))} km` : 'En turno ✓'}</Badge>
-                    : <Badge tone="danger">No apto</Badge>
-                  : <Badge tone="warn">Sin check-in</Badge>}
-            </div>
-          )
-        })}
-      </Card>
-      <p className="t-footnote">La creación y edición de perfiles desde el panel (con invitación por correo) se habilita al conectar Supabase Auth — Fase 1 completa. Fecha: {fecha(new Date())}.</p>
+      <p className="t-footnote">Cifras en CLP, mes en curso. Los ingresos se mostrarán al registrar facturación (tabla <code>revenues</code>); por ahora el P&L refleja solo costos reales. El consolidado semanal por correo se activa al conectar Supabase + Resend.</p>
     </div>
   )
 }

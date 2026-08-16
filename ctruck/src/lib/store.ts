@@ -4,7 +4,7 @@
 
 import type {
   Truck, User, DailyCheckin, Route, RouteAssignment, DeliveryStop,
-  DeliveryRecord, StopVisit, MaintenanceAlert, KmWarning, Expense, CargoReception,
+  DeliveryRecord, StopVisit, MaintenanceAlert, KmWarning, Expense, CargoReception, Company,
 } from './types'
 import { hoy } from './format'
 
@@ -12,6 +12,7 @@ const KEY = 'ctruck-demo-v1'
 const uid = () => crypto.randomUUID()
 
 export interface DB {
+  companies: Company[]
   trucks: Truck[]
   users: User[]
   daily_checkins: DailyCheckin[]
@@ -27,14 +28,15 @@ export interface DB {
 }
 
 function seed(): DB {
+  const companies: Company[] = [{ id: 'c1', name: 'Transportes Demo SpA', rut: '76.543.210-K' }]
   const trucks: Truck[] = [
-    { id: 't1', code: 'CTR-001', plate: 'LXRS-21', current_km: 84200, next_maintenance_km: 90000, status: 'operativo' },
-    { id: 't2', code: 'CTR-002', plate: 'LXTP-84', current_km: 76450, next_maintenance_km: 78000, status: 'operativo' },
-    { id: 't3', code: 'CTR-003', plate: 'LYBB-33', current_km: 91800, next_maintenance_km: 92600, status: 'operativo' },
-    { id: 't4', code: 'CTR-004', plate: 'LYCD-07', current_km: 68900, next_maintenance_km: 75000, status: 'operativo' },
+    { id: 't1', code: 'CTR-001', plate: 'LXRS-21', current_km: 84200, next_maintenance_km: 90000, status: 'operativo', company_id: 'c1' },
+    { id: 't2', code: 'CTR-002', plate: 'LXTP-84', current_km: 76450, next_maintenance_km: 78000, status: 'operativo', company_id: 'c1' },
+    { id: 't3', code: 'CTR-003', plate: 'LYBB-33', current_km: 91800, next_maintenance_km: 92600, status: 'operativo', company_id: 'c1' },
+    { id: 't4', code: 'CTR-004', plate: 'LYCD-07', current_km: 68900, next_maintenance_km: 75000, status: 'operativo', company_id: 'c1' },
   ]
   const users: User[] = [
-    { id: 'u0', name: 'Luis Movillo', rut: '12.345.678-5', role: 'admin', truck_id: null, active: true },
+    { id: 'u0', name: 'Luis Movillo', rut: '12.345.678-5', role: 'super_admin', truck_id: null, company_id: null, active: true },
     { id: 'u1', name: 'Pedro Soto', rut: '14.567.890-3', role: 'driver', truck_id: 't1', active: true },
     { id: 'u2', name: 'Juan Fuentes', rut: '15.678.901-1', role: 'driver', truck_id: 't2', active: true },
     { id: 'u3', name: 'Marcos Rivas', rut: '16.789.012-K', role: 'driver', truck_id: 't3', active: true },
@@ -81,7 +83,7 @@ function seed(): DB {
     }
   }
   return {
-    trucks, users, routes, route_assignments, delivery_stops, expenses,
+    companies, trucks, users, routes, route_assignments, delivery_stops, expenses,
     daily_checkins: [], delivery_records: [], cargo_receptions: [], stop_visits: [],
     maintenance_alerts: [], km_warnings: [],
   }
@@ -95,6 +97,7 @@ function load(): DB {
       // Datos guardados por versiones anteriores: completar colecciones nuevas
       parsed.cargo_receptions ??= []
       parsed.stop_visits ??= []
+      parsed.companies ??= [{ id: 'c1', name: 'Transportes Demo SpA', rut: '76.543.210-K' }]
       return parsed
     }
   } catch { /* seed fresco si el storage está corrupto */ }

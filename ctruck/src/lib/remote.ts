@@ -12,7 +12,12 @@ import type { Role } from './types'
 
 // Columnas reales de cada tabla sincronizable (evita mandar campos locales)
 const SYNC_TABLES: Record<string, string[]> = {
-  trucks: ['id', 'code', 'plate', 'current_km', 'next_maintenance_km', 'status'],
+  companies: ['id', 'name', 'rut'],
+  trucks: ['id', 'code', 'plate', 'current_km', 'next_maintenance_km', 'status', 'company_id'],
+  routes: ['id', 'name', 'origin', 'destination', 'planned_km', 'has_toll', 'toll_cost', 'company_id'],
+  delivery_stops: ['id', 'route_assignment_id', 'stop_order', 'client_name', 'address',
+    'contact_name', 'contact_phone', 'planned_kg', 'planned_items', 'lat', 'lng'],
+  users: ['id', 'name', 'rut', 'email', 'role', 'truck_id', 'company_id', 'active'],
   daily_checkins: ['id', 'user_id', 'truck_id', 'date', 'role', 'aptitude_result', 'aptitude_answers',
     'km_in', 'km_system', 'km_diff', 'km_warning', 'dashboard_photo_url', 'cabin_photo_url',
     'signature_name', 'checkout_km', 'checkout_diff', 'checkout_warning', 'checkin_time', 'checkout_time'],
@@ -27,7 +32,11 @@ const SYNC_TABLES: Record<string, string[]> = {
   expenses: ['id', 'truck_id', 'category', 'amount_clp', 'expense_date', 'description'],
 }
 
-const READ_TABLES = ['trucks', 'users', 'routes', 'route_assignments', 'delivery_stops',
+// users nunca se inserta desde el cliente: el alta pasa por la Edge Function
+// admin-create-user (necesita crear también la cuenta de auth con service role).
+const NO_INSERT = new Set(['users'])
+
+const READ_TABLES = ['companies', 'trucks', 'users', 'routes', 'route_assignments', 'delivery_stops',
   'daily_checkins', 'cargo_receptions', 'delivery_records', 'stop_visits',
   'km_warnings', 'maintenance_alerts', 'expenses'] as const
 
@@ -91,7 +100,7 @@ export async function syncUp(): Promise<void> {
       ;(id in prev ? updates : inserts).push(pick(row, cols))
     }
     const deleted = Object.keys(prev).filter(id => !currentIds.has(id))
-    if (inserts.length) {
+    if (inserts.length && !NO_INSERT.has(table)) {
       const { error } = await supabase.from(table).insert(inserts)
       if (error) console.warn(`[sync] insert ${table}:`, error.message) // reintenta en el próximo ciclo
       else for (const r of inserts) prev[r.id as string] = JSON.stringify(r)
@@ -186,6 +195,47 @@ export function startSync(role: Role): () => void {
     stopRealtime()
     window.removeEventListener('online', onOnline)
   }
+}
+
+export interface NewUserInput {
+  name: string
+  rut: string
+  email: string
+  password: string
+  role: Role
+  company_id: string | null
+  truck_id: string | null
+}
+
+/** Alta de usuario. Remoto: Edge Function con service role. Demo: directo al store. */
+export async function createUser(input: NewUserInput): Promise<{ error?: string }> {
+  if (!supabase) {
+    store.mutate(d => {
+      d.users.push({
+        id: store.uid(), name: input.name, rut: input.rut, email: input.email,
+        role: input.role, truck_id: input.truck_id, company_id: input.company_id, active: true,
+      })
+    })
+    return {}
+  }
+  const { data, error } = await supabase.functions.invoke('admin-create-user', { body: input })
+  if (error) {
+    // el cuerpo del error de la función viene en context
+    try {
+      const body = await (error as { context?: Response }).context?.json()
+      return { error: body?.error ?? error.message }
+    } catch {
+      return { error: error.message }
+    }
+  }
+  const row = (data as { user?: Record<string, unknown> })?.user
+  if (row) {
+    store.mutate(d => { d.users.push({ active: true, ...(row as object) } as never) })
+    snapshot.users ??= {}
+    snapshot.users[(row as { id: string }).id] = JSON.stringify(pick(row as Record<string, unknown>, SYNC_TABLES.users))
+    saveSnapshot()
+  }
+  return {}
 }
 
 /** Sube fotos dataURL al bucket y devuelve rutas de Storage (o el dataURL si falla/offline). */
