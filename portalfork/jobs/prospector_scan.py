@@ -26,6 +26,9 @@ sys.path.insert(0, str(BASE.parent / "agent-handoff"))
 from handoff.config import load_orchestrator  # noqa: E402
 from handoff.providers import Provider  # noqa: E402
 
+sys.path.insert(0, str(BASE))
+from skills import REGISTRY  # noqa: E402
+
 LEADS_FILE = BASE / "leads" / "pendientes_revision.jsonl"
 
 
@@ -58,7 +61,7 @@ def main() -> int:
         return 1
     print(f"{len(resultados)} candidatos encontrados; calificando con el agente prospector...")
 
-    orch = load_orchestrator(str(BASE / "config.yaml"))
+    orch = load_orchestrator(str(BASE / "config.yaml"), skill_registry=REGISTRY)
     orch.entry_agent = "prospector"  # saltamos el router: la tarea ya esta clasificada
 
     LEADS_FILE.parent.mkdir(parents=True, exist_ok=True)

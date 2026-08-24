@@ -15,6 +15,8 @@ if [ ! -f "$ENV_FILE" ]; then
 # Secretos de PortalFork — separados de los de Genesis. chmod 600.
 ANTHROPIC_API_KEY=
 TAVILY_API_KEY=
+# token para usar los agentes internos (prospector/analista) via HTTP:
+PORTALFORK_ADMIN_TOKEN=cambia-esto-por-un-token-largo-aleatorio
 BQ_PROJECT=
 GOOGLE_APPLICATION_CREDENTIALS=/root/portalfork/secrets/bq-reader.json
 OC_MAX_TOTAL_CLP=5000000

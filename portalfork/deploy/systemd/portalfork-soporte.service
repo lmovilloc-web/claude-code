@@ -4,10 +4,16 @@ After=network.target
 
 [Service]
 EnvironmentFile=/root/.portalfork_env
-WorkingDirectory=/root/portalfork-src/agent-handoff
-ExecStart=/usr/bin/python3 -m uvicorn handoff.server:app --host 127.0.0.1 --port 8090
+WorkingDirectory=/root/portalfork-src/portalfork
+ExecStart=/usr/bin/python3 -m uvicorn server:app --host 127.0.0.1 --port 8090
 Restart=on-failure
 RestartSec=5
+# contencion del proceso: sin nuevas capacidades, /root de solo lectura
+# salvo los directorios de datos del propio agente
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/root/portalfork-src/portalfork/data /root/portalfork-src/portalfork/leads /root/portalfork-src/portalfork/oc
+PrivateTmp=yes
 
 [Install]
 WantedBy=multi-user.target
