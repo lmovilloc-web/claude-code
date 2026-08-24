@@ -13,7 +13,9 @@ pip3 install -q pyyaml fastapi uvicorn google-cloud-bigquery
 if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<'EOF'
 # Secretos de PortalFork — separados de los de Genesis. chmod 600.
-ANTHROPIC_API_KEY=
+GROQ_API_KEY=
+XAI_API_KEY=
+TOGETHER_API_KEY=
 TAVILY_API_KEY=
 # token para usar los agentes internos (prospector/analista) via HTTP:
 PORTALFORK_ADMIN_TOKEN=cambia-esto-por-un-token-largo-aleatorio

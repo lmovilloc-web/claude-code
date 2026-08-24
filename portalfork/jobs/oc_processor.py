@@ -11,7 +11,7 @@ Flujo:
       invalida-> rejected/ (con motivo)
 
 Uso:
-    export ANTHROPIC_API_KEY=...
+    export GROQ_API_KEY=...                 # o define OC_BASE_URL/OC_API_KEY_ENV/OC_MODEL
     python3 jobs/oc_processor.py            # procesa todo el intake
 Deja los PDF ya convertidos a texto en intake/ (pdftotext archivo.pdf).
 """
@@ -28,7 +28,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE.parent / "agent-handoff"))
 
-from handoff.providers import AnthropicProvider, Provider  # noqa: E402
+from handoff.providers import OpenAICompatibleProvider, Provider  # noqa: E402
 
 INTAKE = BASE / "oc" / "intake"
 PROCESSED = BASE / "oc" / "processed"
@@ -120,8 +120,12 @@ def main() -> int:
         print("intake vacio, nada que procesar")
         return 0
 
-    provider = AnthropicProvider()
-    model = os.environ.get("OC_MODEL", "claude-haiku-4-5-20251001")
+    # Extractor configurable; por defecto Llama 70B en Groq (barato y con DPA).
+    provider = OpenAICompatibleProvider(
+        base_url=os.environ.get("OC_BASE_URL", "https://api.groq.com/openai/v1"),
+        api_key=os.environ.get(os.environ.get("OC_API_KEY_ENV", "GROQ_API_KEY"), ""),
+    )
+    model = os.environ.get("OC_MODEL", "llama-3.3-70b-versatile")
 
     for path in files:
         print(f"-> {path.name}")

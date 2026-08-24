@@ -9,17 +9,24 @@
 #   security          -> medidas propias, aplicadas por server.py
 
 providers:
-  anthropic:
-    kind: anthropic
-    api_key_env: ANTHROPIC_API_KEY
-
-  openai:
+  groq:                       # Llama servido en EE.UU. (Groq) — barato y con DPA
     kind: openai
-    base_url: https://api.openai.com/v1
-    api_key_env: OPENAI_API_KEY
+    base_url: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
 
-  # Alternativa local en el VPS (Ollama) si algun dia quieres costo cero:
-  # ollama: {kind: openai, base_url: "http://localhost:11434/v1", api_key: ollama}
+  xai:                        # Grok
+    kind: openai
+    base_url: https://api.x.ai/v1
+    api_key_env: XAI_API_KEY
+
+  together:                   # DeepSeek V3 hospedado en EE.UU. (Together).
+    kind: openai              # NUNCA la API de plataforma china para datos
+    base_url: https://api.together.xyz/v1   # de clientes — ver COMPLIANCE.md
+    api_key_env: TOGETHER_API_KEY
+
+  # Opcionales:
+  # anthropic: {kind: anthropic, api_key_env: ANTHROPIC_API_KEY}
+  # ollama:    {kind: openai, base_url: "http://localhost:11434/v1", api_key: ollama}
 
 entry_agent: router
 
@@ -29,8 +36,8 @@ run:
 
 agents:
   router:
-    provider: anthropic
-    model: claude-haiku-4-5-20251001
+    provider: groq
+    model: llama-3.1-8b-instant
     max_tokens: 400
     token_budget: 3000
     handoffs: [soporte, prospector, analista]
@@ -42,8 +49,8 @@ agents:
       max_input_chars: 3000
 
   soporte:
-    provider: anthropic
-    model: claude-haiku-4-5-20251001
+    provider: groq
+    model: llama-3.3-70b-versatile
     max_tokens: 1024
     token_budget: 12000
     handoffs: []
@@ -55,8 +62,8 @@ agents:
       max_input_chars: 4000
 
   prospector:
-    provider: anthropic
-    model: claude-sonnet-5
+    provider: xai
+    model: grok-3
     max_tokens: 2048
     token_budget: 20000
     handoffs: []
@@ -68,8 +75,8 @@ agents:
       max_input_chars: 6000
 
   analista:
-    provider: anthropic
-    model: claude-sonnet-5
+    provider: together
+    model: deepseek-ai/DeepSeek-V3
     max_tokens: 2048
     token_budget: 20000
     handoffs: []

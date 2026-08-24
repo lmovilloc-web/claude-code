@@ -16,10 +16,16 @@ Cada agente se define en tres capas:
 
 | Agente | Modelo | Skills | Seguridad |
 |---|---|---|---|
-| **router** | Haiku | ninguna (solo traspasa) | público, 60 req/h, 3k chars |
-| **soporte** | Haiku | `crear_ticket`, `registrar_supresion` | público, 30 req/h, 4k chars |
-| **prospector** | Sonnet | `buscar_leads` (solo empresas) | interno (token), 20 req/h |
-| **analista** | Sonnet | `leer_extractos`, `estado_ocs` | interno (token), 20 req/h |
+| **router** | Llama 3.1 8B (Groq) | ninguna (solo traspasa) | público, 60 req/h, 3k chars |
+| **soporte** | Llama 3.3 70B (Groq) | `crear_ticket`, `registrar_supresion` | público, 30 req/h, 4k chars |
+| **prospector** | Grok 3 (xAI) | `buscar_leads` (solo empresas) | interno (token), 20 req/h |
+| **analista** | DeepSeek V3 (Together, hosting EE.UU.) | `leer_extractos`, `estado_ocs` | interno (token), 20 req/h |
+
+Los modelos se cambian editando `config.yaml` (proveedor + modelo por
+agente); Anthropic y Ollama quedan como proveedores opcionales comentados.
+Regla que sí se mantiene: DeepSeek/Qwen solo auto-hospedados o en hosting
+occidental con DPA — nunca la API de plataforma china con datos de clientes
+(COMPLIANCE.md).
 
 Jobs deterministas (sin LLM o híbridos, por systemd timer):
 
