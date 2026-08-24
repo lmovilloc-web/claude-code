@@ -1,0 +1,84 @@
+# Arquitectura de ejemplo: router barato (Llama) que delega en especialistas.
+#
+# Copia este archivo a config.yaml, exporta las variables de entorno con tus
+# claves y ejecuta:  python -m handoff.cli --config config.yaml
+#
+# Idea central para ahorrar tokens: el "router" corre en un modelo barato o
+# local y clasifica cada peticion. Solo escala a un modelo caro (Claude)
+# cuando la tarea lo exige. Los handoffs pasan un RESUMEN, no el historial.
+
+providers:
+  grok:
+    kind: openai
+    base_url: https://api.x.ai/v1
+    api_key_env: XAI_API_KEY
+
+  groq_llama:
+    kind: openai
+    base_url: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+
+  ollama:                       # Llama local: coste cero en tokens
+    kind: openai
+    base_url: http://localhost:11434/v1
+    api_key: ollama             # Ollama ignora la clave pero exige alguna
+
+  anthropic:
+    kind: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+
+entry_agent: router
+
+run:
+  max_turns: 12
+  global_token_budget: 120000   # corte de seguridad por conversacion (0 = sin limite)
+
+agents:
+  router:
+    provider: ollama
+    model: llama3.1:8b
+    max_tokens: 512
+    token_budget: 4000
+    handoffs: [coder, researcher, writer]
+    instructions: |
+      Eres el enrutador. NO resuelvas tareas tu mismo salvo saludos o
+      preguntas triviales de una linea. Clasifica la peticion y traspasala:
+      - transfer_to_coder: programacion, bugs, revision de codigo, DevOps.
+      - transfer_to_researcher: busqueda de informacion, analisis, comparativas.
+      - transfer_to_writer: redaccion, resumenes, traducciones, documentos.
+      En el summary del traspaso incluye: que pide el usuario, restricciones
+      mencionadas y cualquier dato concreto (rutas, nombres, cifras).
+
+  coder:
+    provider: grok
+    model: grok-3
+    max_tokens: 4096
+    token_budget: 60000
+    handoffs: [writer]
+    instructions: |
+      Eres el agente de programacion. Resuelve la tarea tecnica de forma
+      completa y verifica tu propio razonamiento. Si el resultado final es
+      un documento para humanos (informe, README), traspasalo a writer con
+      un resumen que incluya tu solucion completa.
+
+  researcher:
+    provider: groq_llama
+    model: llama-3.3-70b-versatile
+    max_tokens: 2048
+    token_budget: 40000
+    handoffs: [writer]
+    instructions: |
+      Eres el agente de investigacion. Analiza la peticion, razona paso a
+      paso y entrega hallazgos concretos con sus supuestos. Si hace falta
+      redaccion pulida, traspasala a writer con tus hallazgos en el summary.
+
+  writer:
+    provider: anthropic
+    model: claude-sonnet-5
+    max_tokens: 4096
+    token_budget: 30000
+    handoffs: []
+    instructions: |
+      Eres el agente de redaccion final. Recibes resumenes de otros agentes
+      y produces la respuesta definitiva para el usuario: clara, completa y
+      en el idioma del usuario. No inventes datos que no esten en el resumen.
