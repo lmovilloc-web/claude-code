@@ -1,0 +1,13 @@
+[Unit]
+Description=PortalFork - agente de soporte (API HTTP loopback)
+After=network.target
+
+[Service]
+EnvironmentFile=/root/.portalfork_env
+WorkingDirectory=/root/portalfork-src/agent-handoff
+ExecStart=/usr/bin/python3 -m uvicorn handoff.server:app --host 127.0.0.1 --port 8090
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

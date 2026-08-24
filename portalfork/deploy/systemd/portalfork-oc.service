@@ -1,0 +1,7 @@
+[Unit]
+Description=PortalFork - procesador de ordenes de compra
+
+[Service]
+Type=oneshot
+EnvironmentFile=/root/.portalfork_env
+ExecStart=/usr/bin/python3 /root/portalfork-src/portalfork/jobs/oc_processor.py

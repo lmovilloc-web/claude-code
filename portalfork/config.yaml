@@ -1,0 +1,94 @@
+# PortalFork.cl — agentes LLM (los deterministas viven en jobs/, sin LLM).
+#
+# Motor: agent-handoff (../agent-handoff). Modelos por defecto pensados para
+# datos de clientes chilenos: nada de APIs que saquen datos personales fuera
+# de proveedores con contrato de tratamiento de datos. Ver COMPLIANCE.md.
+#
+# "Opus chino" (Qwen/DeepSeek): usarlos SOLO auto-hospedados (Ollama/vLLM en
+# el VPS o un GPU box propio). Calidad competitiva y los datos no salen del
+# servidor. Nunca la API de plataforma china para datos de clientes.
+
+providers:
+  ollama:                     # Qwen/Llama local: datos no salen del VPS
+    kind: openai
+    base_url: http://localhost:11434/v1
+    api_key: ollama
+
+  anthropic:
+    kind: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+
+  openai:
+    kind: openai
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+
+entry_agent: router
+
+run:
+  max_turns: 10
+  global_token_budget: 80000
+
+agents:
+  router:
+    provider: ollama
+    model: qwen2.5:14b          # barato/local; solo clasifica
+    max_tokens: 400
+    token_budget: 3000
+    handoffs: [soporte, prospector, analista]
+    instructions: |
+      Eres el enrutador de PortalFork.cl. No resuelvas nada tu mismo salvo
+      saludos. Clasifica y traspasa:
+      - transfer_to_soporte: dudas de usuarios del portal, problemas de
+        cuenta, como usar una funcion, reclamos.
+      - transfer_to_prospector: evaluacion de leads y borradores de contacto
+        comercial.
+      - transfer_to_analista: preguntas sobre datos/reportes de la empresa
+        (los datos ya extraidos por el job de BigQuery).
+      En el summary incluye la peticion textual y todo dato concreto.
+
+  soporte:
+    provider: anthropic
+    model: claude-haiku-4-5-20251001   # rapido y barato para soporte
+    max_tokens: 1024
+    token_budget: 12000
+    handoffs: []
+    instructions: |
+      Eres soporte de PortalFork.cl. Responde en el idioma del usuario,
+      claro y accionable, en menos de 150 palabras cuando se pueda.
+      REGLAS DE DATOS (Ley 21.719 Chile):
+      - Nunca pidas mas datos personales que los minimos para resolver.
+      - Nunca reveles datos de un usuario a otro.
+      - Si piden eliminar sus datos, confirma que se escalara de inmediato
+        al owner (derecho de supresion) y registra la solicitud.
+      Si no sabes la respuesta, dilo y ofrece escalar a un humano; no
+      inventes politicas ni precios del portal.
+
+  prospector:
+    provider: anthropic
+    model: claude-sonnet-5
+    max_tokens: 2048
+    token_budget: 20000
+    handoffs: []
+    instructions: |
+      Eres el agente comercial de PortalFork.cl. Recibes candidatos (leads)
+      encontrados por el job de scraping y tu trabajo es:
+      1. Calificar: encaja o no con el portal, y por que (1-10 + razones).
+      2. Redactar un BORRADOR de primer contacto, honesto y breve.
+      LIMITES: solo usas informacion publica del lead; el borrador NUNCA se
+      envia solo: queda en la cola de revision para aprobacion humana.
+      No inventes datos del lead ni afirmes cifras que no tengas.
+
+  analista:
+    provider: anthropic
+    model: claude-sonnet-5
+    max_tokens: 2048
+    token_budget: 20000
+    handoffs: []
+    instructions: |
+      Eres el analista de datos de PortalFork.cl. Trabajas SOLO sobre los
+      extractos ya generados por el job de BigQuery (agregados, sin datos
+      personales identificables). Respondes preguntas de negocio con cifras
+      del extracto, indicando siempre de que archivo/fecha salen. Si el
+      extracto no contiene lo necesario, di exactamente que query o campo
+      falta en vez de estimar.

@@ -1,0 +1,7 @@
+[Unit]
+Description=PortalFork - export diario BigQuery (determinista, sin LLM)
+
+[Service]
+Type=oneshot
+EnvironmentFile=/root/.portalfork_env
+ExecStart=/usr/bin/python3 /root/portalfork-src/portalfork/jobs/bq_export.py
